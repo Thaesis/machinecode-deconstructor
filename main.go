@@ -6,7 +6,16 @@ import (
 	"fmt"
 	"log"
 	"os"
+  "strings"
 )
+
+// ARMInstruction represents an ARM instruction
+type ARMInstruction struct {
+    Opcode   string
+    DestReg  int
+    SrcReg1  int
+    SrcReg2  int
+}
 
 func main() {
 
@@ -53,4 +62,20 @@ func main() {
 	for _, eachLine := range txtlines {
 		fmt.Println(eachLine)
 	}
+}
+
+func parseMachineCode(machineCode string) ARMInstruction {
+    // Extract fields from the machine code
+    opcode := machineCode[:6]
+    destReg, _ := strconv.ParseInt(machineCode[6:8], 2, 32)
+    srcReg1, _ := strconv.ParseInt(machineCode[8:10], 2, 32)
+    srcReg2, _ := strconv.ParseInt(machineCode[10:12], 2, 32)
+
+    // Create and return an ARMInstruction struct
+    return ARMInstruction{
+        Opcode:  opcode,
+        DestReg: int(destReg),
+        SrcReg1: int(srcReg1),
+        SrcReg2: int(srcReg2),
+    }
 }
