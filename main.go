@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"debug/macho"
 	"flag"
 	"fmt"
 	"log"
@@ -15,6 +16,13 @@ type ARMInstruction struct {
 	DestReg int
 	SrcReg1 int
 	SrcReg2 int
+  Offset int
+  Cond int
+  Imm int
+  Addr int
+  Op2 int
+  Shamt int
+  ShiftCode int
 }
 
 func main() {
@@ -70,62 +78,133 @@ func main() {
 		instruction := parseMachineCode(line)
 		disassembled := disassembleInstruction(instruction, pc)
 		fmt.Fprintf(outFile, "%s %s\n", line, disassembled)
-		pc += 4 // Assuming each instruction is 4 bytes
+		pc += 4
 	}
 
 }
 
 func parseMachineCode(machineCode string) ARMInstruction {
-	// Extract fields from the machine code
-	opcode := machineCode[:6]
-	destReg, _ := strconv.ParseInt(machineCode[6:8], 2, 32)
-	srcReg1, _ := strconv.ParseInt(machineCode[8:10], 2, 32)
-	srcReg2, _ := strconv.ParseInt(machineCode[10:12], 2, 32)
+	/*
+ Parses the fields of the format into the struct. In order of least bit length
+ */
+  switch {
+    
+  case "000101" == machineCode[:6]: //B Format | 6-bit
+    opcode := "B"
+    offset, _ := strconv.ParseInt(machineCode[6:], 2, 32)
+    
+  case "10110100", "10110101" == machineCode[:9]: //CB Format | 8-bit
+    
+    if (machineCode[:9] == "10110100") {
+      opcode := "CBZ"
+    } else {
+      opcode := "CBNZ"
+    }
+    offset, _ := strconv.ParseInt(machineCode[8:27], 2, 32)
+    cond, _ := strconv.ParseInt(machineCode[27:], 2, 32)
+    
+  case "110100101" == machineCode[:9]: //IM Format | 9-bit
+    
+    opcode := "MOVZ"
+    shiftCode, _ := strconv.ParseInt(machineCode[9:11], 2, 32)
+    field, _ := strconv.ParseInt(machineCode[11:28], 2, 32)
+    destReg, _ := strconv.ParseInt(machineCode[28:], 2, 32)
+    
+  case "1001000100", "1101000100" == machineCode[:10]: // I Format | 10-bit
+    
+    if (machineCode[:10] == "1001000100") {
+      opcode := "ADDI"
+    } else {
+      opcode := "SUBI"
+    }
+    imm, _ := strconv.ParseInt(machineCode[10:23], 2, 32)
+    srcReg1, _ := strconv.ParseInt(machineCode[23:28], 2, 32)
+    destReg, _ := strconv.ParseInt(machineCode[28:], 2, 32)
+    
+  case "11111000000", "11111000010" == machineCode[:11]: // D Format | 11-bit
+    
+    if (machineCode[:11] == "11111000000") q{
+      opcode := "STUR"
+    } else {
+      opcode := "LUDR"
+    }
+    addr, _ := strconv.ParseInt(machineCode[11:21], 2, 32)
+    op2, _ := strconv.ParseInt(machineCode[21:23], 2, 32)
+    srcReg1, _ := strconv.ParseInt(machineCode[23:28], 2, 32)
+    srcReg2, _ := strconv.ParseInt(machineCode[28:], 2, 32)
 
-	// Create and return an ARMInstruction struct
-	return ARMInstruction{
-		Opcode:  opcode,
-		DestReg: int(destReg),
-		SrcReg1: int(srcReg1),
-		SrcReg2: int(srcReg2),
-	}
+  case "11001011000",  //SUB
+        "10001011000", //ADD
+        "10001010000", //AND
+        "10101010000", //ORR
+        "11001010000", //EOR
+        "11010011011", //LSL
+        "11010011010" == machineCode[:12]:
+
+    if (machineCode[:12] == "1100101100") {opcode := "SUB"}
+    if (machineCode[:12] == "10001011000") {opcode := "ADD"}
+    if (machineCode[:12] == "10001010000") {opcoded := "AND"}
+    if (machineCode[:12] == "10101010000") {opcode := "ORR"}
+    if (machineCode[:12] == "11001010000") {opcode := "EOR"}
+    if (machineCode[:12] == "11010011011") {opcode := "LSL"}
+    if (machineCode[:12] == "11010011010") {
+      opcode := "LSR"
+    } else {opcode := "ASR"}
+
+    srcReg1, _ := strconv.ParseInt(machineCode[13:17], 2, 32)
+    shamt, _ := strconv.ParseInt(machineCode[17:23], 2, 32)
+    srcReg2, _ := strconv.ParseInt(machineCode[23:28], 2, 32)
+    destReg, _ := strconv.ParseInt(machineCode[28:], 2, 32)
+    }
+  
+  return ARMInstruction{
+    Opcode: opcode,
+    DestReg: int(destReg),
+    SrcReg1: int(srcReg1),
+    SrcReg2: int(srcReg2),
+    Offset: int(offset),
+    Cond: int(cond),
+    Imm: int(imm),
+    Addr: int(addr),
+    Op2: int(op2),
+    Shamt: int(shamt),
+    ShiftCode: int(shiftCode),
+    }
 }
 
 func disassembleInstruction(instr ARMInstruction, pc int) string {
 	switch instr.Opcode {
-	case "100010": // ADD
-		return fmt.Sprintf("ADD R%d, R%d, R%d", instr.DestReg, instr.SrcReg1, instr.SrcReg2)
-	case "110010": // SUB
-		return fmt.Sprintf("SUB R%d, R%d, R%d", instr.DestReg, instr.SrcReg1, instr.SrcReg2)
-	case "100000": // AND
-		return fmt.Sprintf("AND R%d, R%d, R%d", instr.DestReg, instr.SrcReg1, instr.SrcReg2)
-	case "101000": // ORR
-		return fmt.Sprintf("ORR R%d, R%d, R%d", instr.DestReg, instr.SrcReg1, instr.SrcReg2)
-	case "000101": // B
-		offset, _ := strconv.ParseInt(instr.Opcode[6:], 2, 32)
+  
+  case "ADD", "SUB", "AND", "ORR", "EOR" :
+    retrun fmt.Sprintf("%03d %d R%d, R%d, R%d", pc, instr.Opcode, instr.SrcReg1, instr.SrcReg2)
+
+	case "B": 
 		// Adjust for signed value
-		offset <<= 2
-		target := pc + int(offset)
-		return fmt.Sprintf("B #%d", target)
-	case "100100": // ADDI
-		imm, _ := strconv.ParseInt(instr.Opcode[6:], 2, 32)
-		return fmt.Sprintf("ADDI R%d, R%d, #%d", instr.DestReg, instr.SrcReg1, imm)
-	case "110100": // SUBI
-		imm, _ := strconv.ParseInt(instr.Opcode[6:], 2, 32)
-		return fmt.Sprintf("SUBI R%d, R%d, #%d", instr.DestReg, instr.SrcReg1, imm)
-	case "111110": // LDUR, STUR
-		offset, _ := strconv.ParseInt(instr.Opcode[6:], 2, 32)
-		return fmt.Sprintf("%s R%d, [R%d, #%d]", "LDUR", instr.DestReg, instr.SrcReg1, offset)
-	case "101101": // CBZ, CBNZ
-		offset, _ := strconv.ParseInt(instr.Opcode[6:], 2, 32)
+		instr.Offset <<= 2
+		instr.DestReg := pc + int(instr.Offset * 4)
+		return fmt.Sprintf("%03d B #%d", pc, instr.DestReg)
+    
+	case "ADDI", "SUBI": 
+		return fmt.Sprintf("%03d %d R%d, R%d, #%d", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, isntr.Imm)
+    
+	case "LDUR", "STUR": 
+    instr.DestReg := pc + int(instr.Offset * 4)
+		return fmt.Sprintf("%03d %d R%d, [R%d, #%d]", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, instr.DestReg)
+    
+	case "CBZ", "CBNZ": 
 		// Adjust for signed value
-		offset <<= 2
-		target := pc + int(offset)
-		if instr.DestReg&1 == 0 {
-			return fmt.Sprintf("CBZ R%d, #%d", instr.DestReg, target)
-		} else {
-			return fmt.Sprintf("CBNZ R%d, #%d", instr.DestReg, target)
-		}
+		instr.Offset <<= 2
+		instr.DestReg := pc + int(instr.Offset * 4)
+		return fmt.Sprintf("%03d %d R%d, #%d", pc, instr.Opcode, instr.DestReg, instr.DestReg)
+		
+  case "MOVZ": 
+    return fmt.Sprintf("%03d %d R%d, #%d, LSL %d", pc, instr.Opcode, instr.DestReg, instr.Imm, instr.ShiftCode)
+    
+  case "LSR", "LSL":
+    return fmt.Sprintf("%03d %d R%d, R%d, #%d", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, instr.Shamt)
+    
+  case "1111001": //BREAK
+    return "BREAK"
 	default:
 		return "UNKNOWN INSTRUCTION"
 	}
