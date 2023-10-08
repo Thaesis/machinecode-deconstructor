@@ -11,10 +11,18 @@ import (
 
 // ARMInstruction represents an ARM instruction
 type ARMInstruction struct {
-	Opcode  string
-	DestReg int
-	SrcReg1 int
-	SrcReg2 int
+	Opcode    string
+	DestReg   int
+	SrcReg1   int
+	SrcReg2   int
+	Offset    int
+	Cond      int
+	Imm       int
+	Addr      int
+	Op2       int
+	Shamt     int
+	ShiftCode int
+	Field     int
 }
 
 func main() {
@@ -58,74 +66,173 @@ func main() {
 
 	inFile.Close()
 
-  // Open output file for writing
+	// Open output file for writing
 	outFile, outErr = os.Create(*outputFileName)
 	if outErr != nil {
 		log.Fatalf("Error creating output file: %s", outErr)
 	}
 	defer outFile.Close()
 
-  pc := 96 //initial program counter value
-  for _, line := range lnData {
+	pc := 96 //initial program counter value
+	for _, line := range lnData {
 		instruction := parseMachineCode(line)
 		disassembled := disassembleInstruction(instruction, pc)
 		fmt.Fprintf(outFile, "%s %s\n", line, disassembled)
-		pc += 4 // Assuming each instruction is 4 bytes
+		pc += 4
 	}
 
 }
 
 func parseMachineCode(machineCode string) ARMInstruction {
-	// Extract fields from the machine code
-	opcode := machineCode[:6]
-	destReg, _ := strconv.ParseInt(machineCode[6:8], 2, 32)
-	srcReg1, _ := strconv.ParseInt(machineCode[8:10], 2, 32)
-	srcReg2, _ := strconv.ParseInt(machineCode[10:12], 2, 32)
+	/*
+	 Parses the fields of the format into the struct. In order of least bit length
+	*/
+	var opcode string
+	var destReg, srcReg1, srcReg2, offset, cond, imm, addr, op2, shamt, shiftCode, field int64
 
-	// Create and return an ARMInstruction struct
+	if "000101" == machineCode[:6] { //B Format | 6-bit
+		opcode = "B"
+		offset, _ = strconv.ParseInt(machineCode[6:], 2, 32)
+	}
+	if "10110101" == machineCode[:9] || "10110100" == machineCode[:9] { //CB Format | 8-bit
+
+		if machineCode[:9] == "10110100" {
+			opcode = "CBZ"
+		} else {
+			opcode = "CBNZ"
+		}
+
+		offset, _ = strconv.ParseInt(machineCode[8:27], 2, 32)
+		cond, _ = strconv.ParseInt(machineCode[27:], 2, 32)
+
+	}
+	if "110100101" == machineCode[:9] || "111100101" == machineCode[:9] { //IM Format | 9-bit
+
+		if machineCode[:9] == "110100101" {
+			opcode = "MOVZ"
+		} else {
+			opcode = "MOVK"
+		}
+
+		shiftCode, _ = strconv.ParseInt(machineCode[9:11], 2, 32)
+		field, _ = strconv.ParseInt(machineCode[11:28], 2, 32)
+		destReg, _ = strconv.ParseInt(machineCode[28:], 2, 32)
+
+	}
+	if "1101000100" == machineCode[:10] || "100100100" == machineCode[:10] { // I Format | 10-bit
+
+		if machineCode[:10] == "1001000100" {
+			opcode = "ADDI"
+		} else {
+			opcode = "SUBI"
+		}
+
+		imm, _ = strconv.ParseInt(machineCode[10:23], 2, 32)
+		srcReg1, _ = strconv.ParseInt(machineCode[23:28], 2, 32)
+		destReg, _ = strconv.ParseInt(machineCode[28:], 2, 32)
+
+	}
+	if "11111000010" == machineCode[:11] || "11111000000" == machineCode[:11] { // D Format | 11-bit
+
+		if machineCode[:11] == "11111000000" {
+			opcode = "STUR"
+		} else {
+			opcode = "LUDR"
+		}
+
+		addr, _ = strconv.ParseInt(machineCode[11:21], 2, 32)
+		op2, _ = strconv.ParseInt(machineCode[21:23], 2, 32)
+		srcReg1, _ = strconv.ParseInt(machineCode[23:28], 2, 32)
+		srcReg2, _ = strconv.ParseInt(machineCode[28:], 2, 32)
+
+	}
+	if "11001011000" == machineCode[:11] ||
+		"10001011000" == machineCode[:11] ||
+		"10001010000" == machineCode[:11] ||
+		"10101010000" == machineCode[:11] ||
+		"11001010000" == machineCode[:11] ||
+		"11010011011" == machineCode[:11] ||
+		"11010011010" == machineCode[:11] {
+
+		if machineCode[:11] == "1100101100" {
+			opcode = "SUB"
+		}
+		if machineCode[:11] == "10001011000" {
+			opcode = "ADD"
+		}
+		if machineCode[:11] == "10001010000" {
+			opcode = "AND"
+		}
+		if machineCode[:11] == "10101010000" {
+			opcode = "ORR"
+		}
+		if machineCode[:11] == "11001010000" {
+			opcode = "EOR"
+		}
+		if machineCode[:11] == "11010011011" {
+			opcode = "LSL"
+		}
+		if machineCode[:11] == "11010011010" {
+			opcode = "LSR"
+		} else {
+			opcode = "ASR"
+		}
+
+		srcReg1, _ = strconv.ParseInt(machineCode[11:16], 2, 32)
+		shamt, _ = strconv.ParseInt(machineCode[16:22], 2, 32)
+		srcReg2, _ = strconv.ParseInt(machineCode[22:27], 2, 32)
+		destReg, _ = strconv.ParseInt(machineCode[27:], 2, 32)
+
+	}
 	return ARMInstruction{
-		Opcode:  opcode,
-		DestReg: int(destReg),
-		SrcReg1: int(srcReg1),
-		SrcReg2: int(srcReg2),
+		Opcode:    opcode,
+		DestReg:   int(destReg),
+		SrcReg1:   int(srcReg1),
+		SrcReg2:   int(srcReg2),
+		Offset:    int(offset),
+		Cond:      int(cond),
+		Imm:       int(imm),
+		Addr:      int(addr),
+		Op2:       int(op2),
+		Shamt:     int(shamt),
+		ShiftCode: int(shiftCode),
+		Field:     int(field),
 	}
 }
 
 func disassembleInstruction(instr ARMInstruction, pc int) string {
 	switch instr.Opcode {
-	case "100010": // ADD
-		return fmt.Sprintf("ADD R%d, R%d, R%d", instr.DestReg, instr.SrcReg1, instr.SrcReg2)
-	case "110010": // SUB
-		return fmt.Sprintf("SUB R%d, R%d, R%d", instr.DestReg, instr.SrcReg1, instr.SrcReg2)
-	case "100000": // AND
-		return fmt.Sprintf("AND R%d, R%d, R%d", instr.DestReg, instr.SrcReg1, instr.SrcReg2)
-	case "101000": // ORR
-		return fmt.Sprintf("ORR R%d, R%d, R%d", instr.DestReg, instr.SrcReg1, instr.SrcReg2)
-	case "000101": // B
-		offset, _ := strconv.ParseInt(instr.Opcode[6:], 2, 32)
+
+	case "ADD", "SUB", "AND", "ORR", "EOR":
+		return fmt.Sprintf("%03d %s R%d, R%d, R%d", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, instr.SrcReg2)
+
+	case "B":
 		// Adjust for signed value
-		offset <<= 2
-		target := pc + int(offset)
-		return fmt.Sprintf("B #%d", target)
-	case "100100": // ADDI
-		imm, _ := strconv.ParseInt(instr.Opcode[6:], 2, 32)
-		return fmt.Sprintf("ADDI R%d, R%d, #%d", instr.DestReg, instr.SrcReg1, imm)
-	case "110100": // SUBI
-		imm, _ := strconv.ParseInt(instr.Opcode[6:], 2, 32)
-		return fmt.Sprintf("SUBI R%d, R%d, #%d", instr.DestReg, instr.SrcReg1, imm)
-	case "111110": // LDUR, STUR
-		offset, _ := strconv.ParseInt(instr.Opcode[6:], 2, 32)
-		return fmt.Sprintf("%s R%d, [R%d, #%d]", "LDUR", instr.DestReg, instr.SrcReg1, offset)
-	case "101101": // CBZ, CBNZ
-		offset, _ := strconv.ParseInt(instr.Opcode[6:], 2, 32)
+		instr.Offset <<= 2
+		instr.DestReg = pc + int(instr.Offset*4)
+		return fmt.Sprintf("%03d %s #%d", pc, instr.Opcode, instr.DestReg)
+
+	case "ADDI", "SUBI":
+		return fmt.Sprintf("%03d %s R%d, R%d, #%d", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, instr.Imm)
+
+	case "LDUR", "STUR":
+		instr.DestReg = pc + int(instr.Offset*4)
+		return fmt.Sprintf("%03d %s R%d, [R%d, #%d]", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, instr.DestReg)
+
+	case "CBZ", "CBNZ":
 		// Adjust for signed value
-		offset <<= 2
-		target := pc + int(offset)
-		if instr.DestReg&1 == 0 {
-			return fmt.Sprintf("CBZ R%d, #%d", instr.DestReg, target)
-		} else {
-			return fmt.Sprintf("CBNZ R%d, #%d", instr.DestReg, target)
-		}
+		instr.Offset <<= 2
+		instr.DestReg = pc + int(instr.Offset*4)
+		return fmt.Sprintf("%03d %s R%d, #%d", pc, instr.Opcode, instr.DestReg, instr.DestReg)
+
+	case "MOVZ", "MOVK":
+		return fmt.Sprintf("%03d %s R%d, #%d, LSL %d", pc, instr.Opcode, instr.DestReg, instr.Imm, instr.ShiftCode)
+
+	case "LSR", "LSL":
+		return fmt.Sprintf("%03d %s R%d, R%d, #%d", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, instr.Shamt)
+
+	case "1111001": //BREAK
+		return "BREAK"
 	default:
 		return "UNKNOWN INSTRUCTION"
 	}
