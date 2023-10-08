@@ -146,26 +146,24 @@ func parseMachineCode(machineCode string) ARMInstruction {
 		srcReg2, _ = strconv.ParseInt(machineCode[28:], 2, 32)
 
 	}
-	if "11001011000" == machineCode[:11] ||
-		"10001011000" == machineCode[:11] ||
-		"10001010000" == machineCode[:11] ||
-		"10101010000" == machineCode[:11] ||
-		"11001010000" == machineCode[:11] ||
-		"11010011011" == machineCode[:11] ||
-		"11101010000" == machineCode[:11] ||
-		"11010011010" == machineCode[:11] {
+	if "11001011000" == machineCode[:11] || //SUB
+		"10001011000" == machineCode[:11] || //ADD
+		"10001010000" == machineCode[:11] || //ANDS
+		"10101010000" == machineCode[:11] || //AND
+		"11001010000" == machineCode[:11] || //ORR
+		"11010011011" == machineCode[:11] || //EOR
+		"11101010000" == machineCode[:11] || //LSL
+		"11010011010" == machineCode[:11] { //LSR
 
 		if machineCode[:11] == "11001011000" {
 			opcode = "SUB"
 		} else if machineCode[:11] == "10001011000" {
 			opcode = "ADD"
-		} else if machineCode[:11] == "11101010000" {
-			opcode = "ANDS"
 		} else if machineCode[:11] == "10001010000" {
 			opcode = "AND"
 		} else if machineCode[:11] == "10101010000" {
 			opcode = "ORR"
-		} else if machineCode[:11] == "11001010000" {
+		} else if machineCode[:11] == "11101010000" {
 			opcode = "EOR"
 		} else if machineCode[:11] == "11010011011" {
 			opcode = "LSL"
@@ -181,6 +179,13 @@ func parseMachineCode(machineCode string) ARMInstruction {
 		destReg, _ = strconv.ParseInt(machineCode[27:], 2, 32)
 
 	}
+	if "11111110110111101111111111100111" == machineCode[0:] {
+		opcode = "BREAK"
+	}
+	if "00000000000000000000000000000000" == machineCode[0:] {
+		opcode = "NOP"
+	}
+
 	return ARMInstruction{
 		Opcode:    opcode,
 		DestReg:   int(destReg),
@@ -203,7 +208,7 @@ func disassembleInstruction(instr ARMInstruction, pc int) string {
 	case "ADD", "SUB":
 		return fmt.Sprintf("%03d %s R%d, R%d, R%d", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, instr.SrcReg2)
 
-	case "AND", "ANDS", "ORR", "EOR":
+	case "AND", "ORR", "EOR":
 		return fmt.Sprintf("%03d %s R%d, R%d, R%d", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, instr.SrcReg2)
 
 	case "B":
@@ -228,11 +233,13 @@ func disassembleInstruction(instr ARMInstruction, pc int) string {
 	case "MOVZ", "MOVK":
 		return fmt.Sprintf("%03d %s R%d, #%d, LSL %d", pc, instr.Opcode, instr.DestReg, instr.Imm, instr.ShiftCode)
 
-	case "LSR", "LSL":
+	case "LSR", "LSL", "ASR":
 		return fmt.Sprintf("%03d %s R%d, R%d, #%d", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, instr.Shamt)
 
-	case "1111001": //BREAK
-		return "BREAK"
+	case "BREAK":
+		return fmt.Sprintf("%30d %s R%d", pc, instr.Opcode, instr.DestReg)
+	case "NOP":
+		return fmt.Sprintf("%s", instr.Opcode)
 	default:
 		return "UNKNOWN INSTRUCTION"
 	}
