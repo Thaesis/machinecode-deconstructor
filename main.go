@@ -25,6 +25,8 @@ type ARMInstruction struct {
 	Field     int
 }
 
+var breakEncountered = false // flag to indicate BREAK
+
 func main() {
 
 	// Flag i/o retrieval
@@ -74,10 +76,26 @@ func main() {
 	defer outFile.Close()
 
 	pc := 96 //initial program counter value
+
 	for _, line := range lnData {
 		instruction := parseMachineCode(line)
-		disassembled := disassembleInstruction(instruction, pc)
-		fmt.Fprintf(outFile, "%s %s\n", line, disassembled)
+
+		if breakEncountered {
+			if instruction.Opcode == "BREAK" {
+				breakEncountered = false
+				fmt.Fprintf(outFile, "%s %d BREAK\n", line, pc)
+			} else {
+				fmt.Fprintf(outFile, "%s %d -1 //DATA\n", line, pc)
+			}
+
+		} else {
+			disassembled := disassembleInstruction(instruction, pc)
+			fmt.Fprintf(outFile, "%s %s\n", line, disassembled)
+
+			if instruction.Opcode == "BREAK" {
+				breakEncountered = true
+			}
+		}
 		pc += 4
 	}
 
@@ -237,7 +255,11 @@ func disassembleInstruction(instr ARMInstruction, pc int) string {
 		return fmt.Sprintf("%03d %s R%d, R%d, #%d", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, instr.Shamt)
 
 	case "BREAK":
-		return fmt.Sprintf("%03d %s", pc, instr.Opcode)
+		if breakEncountered {
+			return fmt.Sprintf("%03d %s", pc, instr.Opcode)
+		} else {
+			return fmt.Sprintf("%03d %s", pc, instr.Opcode)
+		}
 	case "NOP":
 		return fmt.Sprintf("%s", instr.Opcode)
 	default:
