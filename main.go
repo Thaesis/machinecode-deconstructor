@@ -237,7 +237,7 @@ func disassembleInstruction(instr ARMInstruction, pc int) string {
 		return fmt.Sprintf("%03d %s R%d, R%d, #%d", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, instr.Shamt)
 
 	case "BREAK":
-		return fmt.Sprintf("%30d %s R%d", pc, instr.Opcode, instr.DestReg)
+		return fmt.Sprintf("%03d %s", pc, instr.Opcode)
 	case "NOP":
 		return fmt.Sprintf("%s", instr.Opcode)
 	default:
