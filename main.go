@@ -152,27 +152,24 @@ func parseMachineCode(machineCode string) ARMInstruction {
 		"10101010000" == machineCode[:11] ||
 		"11001010000" == machineCode[:11] ||
 		"11010011011" == machineCode[:11] ||
+		"11101010000" == machineCode[:11] ||
 		"11010011010" == machineCode[:11] {
 
-		if machineCode[:11] == "1100101100" {
+		if machineCode[:11] == "11001011000" {
 			opcode = "SUB"
-		}
-		if machineCode[:11] == "10001011000" {
+		} else if machineCode[:11] == "10001011000" {
 			opcode = "ADD"
-		}
-		if machineCode[:11] == "10001010000" {
+		} else if machineCode[:11] == "11101010000" {
+			opcode = "ANDS"
+		} else if machineCode[:11] == "10001010000" {
 			opcode = "AND"
-		}
-		if machineCode[:11] == "10101010000" {
+		} else if machineCode[:11] == "10101010000" {
 			opcode = "ORR"
-		}
-		if machineCode[:11] == "11001010000" {
+		} else if machineCode[:11] == "11001010000" {
 			opcode = "EOR"
-		}
-		if machineCode[:11] == "11010011011" {
+		} else if machineCode[:11] == "11010011011" {
 			opcode = "LSL"
-		}
-		if machineCode[:11] == "11010011010" {
+		} else if machineCode[:11] == "11010011010" {
 			opcode = "LSR"
 		} else {
 			opcode = "ASR"
@@ -203,7 +200,10 @@ func parseMachineCode(machineCode string) ARMInstruction {
 func disassembleInstruction(instr ARMInstruction, pc int) string {
 	switch instr.Opcode {
 
-	case "ADD", "SUB", "AND", "ORR", "EOR":
+	case "ADD", "SUB":
+		return fmt.Sprintf("%03d %s R%d, R%d, R%d", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, instr.SrcReg2)
+
+	case "AND", "ANDS", "ORR", "EOR":
 		return fmt.Sprintf("%03d %s R%d, R%d, R%d", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, instr.SrcReg2)
 
 	case "B":
