@@ -111,20 +111,17 @@ func parseMachineCode(machineCode string) ARMInstruction {
 	if "000101" == machineCode[:6] { //B Format | 6-bit
 		opcode = "B"
 		offset, _ = strconv.ParseInt(machineCode[6:], 2, 32)
-	}
-	if "10110101" == machineCode[:9] || "10110100" == machineCode[:9] { //CB Format | 8-bit
+	} else if "10110101" == machineCode[:8] || "10110100" == machineCode[:8] { //CB Format | 8-bit
 
-		if machineCode[:9] == "10110100" {
+		if machineCode[:8] == "10110100" {
 			opcode = "CBZ"
 		} else {
 			opcode = "CBNZ"
 		}
-
 		offset, _ = strconv.ParseInt(machineCode[8:27], 2, 32)
 		cond, _ = strconv.ParseInt(machineCode[27:], 2, 32)
 
-	}
-	if "110100101" == machineCode[:9] || "111100101" == machineCode[:9] { //IM Format | 9-bit
+	} else if "110100101" == machineCode[:9] || "111100101" == machineCode[:9] { //IM Format | 9-bit
 
 		if machineCode[:9] == "110100101" {
 			opcode = "MOVZ"
@@ -136,8 +133,7 @@ func parseMachineCode(machineCode string) ARMInstruction {
 		field, _ = strconv.ParseInt(machineCode[11:28], 2, 32)
 		destReg, _ = strconv.ParseInt(machineCode[28:], 2, 32)
 
-	}
-	if "1101000100" == machineCode[:10] || "100100100" == machineCode[:10] { // I Format | 10-bit
+	} else if "1101000100" == machineCode[:10] || "100100100" == machineCode[:10] { // I Format | 10-bit
 
 		if machineCode[:10] == "1001000100" {
 			opcode = "ADDI"
@@ -149,13 +145,12 @@ func parseMachineCode(machineCode string) ARMInstruction {
 		srcReg1, _ = strconv.ParseInt(machineCode[23:28], 2, 32)
 		destReg, _ = strconv.ParseInt(machineCode[28:], 2, 32)
 
-	}
-	if "11111000010" == machineCode[:11] || "11111000000" == machineCode[:11] { // D Format | 11-bit
+	} else if "11111000010" == machineCode[:11] || "11111000000" == machineCode[:11] { // D Format | 11-bit
 
 		if machineCode[:11] == "11111000000" {
 			opcode = "STUR"
 		} else {
-			opcode = "LUDR"
+			opcode = "LDUR"
 		}
 
 		addr, _ = strconv.ParseInt(machineCode[11:21], 2, 32)
@@ -163,8 +158,7 @@ func parseMachineCode(machineCode string) ARMInstruction {
 		srcReg1, _ = strconv.ParseInt(machineCode[23:28], 2, 32)
 		srcReg2, _ = strconv.ParseInt(machineCode[28:], 2, 32)
 
-	}
-	if "11001011000" == machineCode[:11] || //SUB
+	} else if "11001011000" == machineCode[:11] || //SUB
 		"10001011000" == machineCode[:11] || //ADD
 		"10001010000" == machineCode[:11] || //ANDS
 		"10101010000" == machineCode[:11] || //AND
@@ -196,8 +190,7 @@ func parseMachineCode(machineCode string) ARMInstruction {
 		srcReg2, _ = strconv.ParseInt(machineCode[22:27], 2, 32)
 		destReg, _ = strconv.ParseInt(machineCode[27:], 2, 32)
 
-	}
-	if "11111110110111101111111111100111" == machineCode[0:] {
+	} else if "11111110110111101111111111100111" == machineCode[0:] {
 		opcode = "BREAK"
 	}
 	if "00000000000000000000000000000000" == machineCode[0:] {
@@ -243,10 +236,7 @@ func disassembleInstruction(instr ARMInstruction, pc int) string {
 		return fmt.Sprintf("%03d %s R%d, [R%d, #%d]", pc, instr.Opcode, instr.DestReg, instr.SrcReg1, instr.DestReg)
 
 	case "CBZ", "CBNZ":
-		// Adjust for signed value
-		instr.Offset <<= 2
-		instr.DestReg = pc + int(instr.Offset*4)
-		return fmt.Sprintf("%03d %s R%d, #%d", pc, instr.Opcode, instr.DestReg, instr.DestReg)
+		return fmt.Sprintf("%03d %s R%d, #%d", pc, instr.Opcode, instr.DestReg, instr.Offset)
 
 	case "MOVZ", "MOVK":
 		return fmt.Sprintf("%03d %s R%d, #%d, LSL %d", pc, instr.Opcode, instr.DestReg, instr.Imm, instr.ShiftCode)
@@ -265,4 +255,21 @@ func disassembleInstruction(instr ARMInstruction, pc int) string {
 	default:
 		return "UNKNOWN INSTRUCTION"
 	}
+}
+
+/*
+	func isTComp(binartStr string) bool {
+		if
+	}
+*/
+func tComp(binaryStr string) string {
+	twosComp := ""
+	for _, bit := range binaryStr {
+		if bit == '0' {
+			twosComp += "1"
+		} else {
+			twosComp += "0"
+		}
+	}
+	return twosComp
 }
